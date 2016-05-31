@@ -2,6 +2,7 @@
 #include <vector>
 #include <list>
 #include <queue>
+#include <array>
 
 struct Edge
 {
@@ -27,8 +28,11 @@ enum class Category { Unseen, Fringe, Tree };
 
 using Vertax = char;
 using EdgeList = std::list<Edge>;
+using EdgeUA = std::array<Edge, 27>;
 using EdgePQ = std::priority_queue<Edge, std::vector<Edge>, Comparator>;
 
+template <typename Callback>
+void dijkstra_ua(const int &N, const std::vector<EdgeList> &edge_lists, Callback callback);
 template <typename Callback>
 void dijkstra_pq(const int &N, const std::vector<EdgeList> &edge_lists, Callback callback);
 void print_edge_lists(const std::vector<Vertax> &v, const std::vector<EdgeList> &els);
@@ -55,10 +59,90 @@ int main()
 
 	print_edge_lists(verticles, edge_lists);
 
+
+	std::cout << ":: Dijkstra Algorithm ::" << std::endl;
+	
+	std::cout << ":: >> with Unsorted Array ::" << std::endl;
+	dijkstra_ua(N, edge_lists, [&verticles] (const Edge &e)
+			{
+				std::cout << verticles[e.to] << " of distance from A is " << e.weight << std::endl;
+			});
+
+	std::cout << std::endl << ":: >> with Priority Queue ::" << std::endl;
 	dijkstra_pq(N, edge_lists, [&verticles] (const Edge &e)
 			{
 				std::cout << verticles[e.to] << " of distance from A is " << e.weight << std::endl;
 			});
+}
+
+template <typename Callback>
+void dijkstra_ua(const int &N, const std::vector<EdgeList> &edge_lists, Callback callback)
+{
+	// Unsorted array of index means Edge of destination (to) 
+	EdgeUA fringe_ua{0, 0, 0};
+	int ua_cnt = 0;
+	std::vector<Category> states(1 + N);
+	std::vector<int> memo(1 + N, INT_MAX);
+
+	int sel_vertax = 1;
+	states[sel_vertax] = Category::Tree;
+	memo[sel_vertax] = 0;
+
+	for (auto &e: edge_lists[sel_vertax])
+	{
+		states[e.to] = Category::Fringe;
+		fringe_ua[e.to] = e;
+		ua_cnt++;
+	}
+
+	callback(Edge{sel_vertax, sel_vertax, 0});
+
+	while (ua_cnt > 0)
+	{
+		int min_idx;
+		
+		for (min_idx = 1; min_idx <= N; min_idx++)
+			if (states[min_idx] == Category::Fringe) break;
+
+		for (int i = min_idx + 1; i <= N; i++)
+		{
+			if (states[i] == Category::Fringe
+					&& fringe_ua[min_idx].weight > fringe_ua[i].weight)
+				min_idx = i;
+		}
+
+		if (min_idx == N + 1) 
+		{
+			ua_cnt--;
+			continue;
+		}
+
+		auto &now_edge = fringe_ua[min_idx];
+		states[now_edge.to] = Category::Tree;
+		memo[now_edge.to] = now_edge.weight;
+		ua_cnt--;
+
+		for (auto &e: edge_lists[now_edge.to])
+		{
+			if (states[e.to] == Category::Fringe
+				&& fringe_ua[e.to].weight > memo[e.from] + e.weight)
+			{
+				fringe_ua[e.to].from = e.from;
+				fringe_ua[e.to].to = e.to;
+				fringe_ua[e.to].weight = memo[e.from] + e.weight;
+			}
+			else if (states[e.to] == Category::Unseen)
+			{
+				states[e.to] = Category::Fringe;
+				fringe_ua[e.to].from = e.from;
+				fringe_ua[e.to].to = e.to;
+				fringe_ua[e.to].weight = memo[e.from] + e.weight;
+				ua_cnt++;
+			}
+		}
+
+		callback(now_edge);
+	}
 }
 
 template <typename Callback>
